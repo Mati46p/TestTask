@@ -1,0 +1,138 @@
+
+
+--- Zawartość pliku: C:\Users\Admin\Desktop\TestTask\Assets\Editor\DisableBitcode.cs ---
+
+/**
+ * Copyright (c) 2014-present, Facebook, Inc. All rights reserved.
+ *
+ * You are hereby granted a non-exclusive, worldwide, royalty-free license to use,
+ * copy, modify, and distribute this software in source code or binary form for use
+ * in connection with the web services and APIs provided by Facebook.
+ *
+ * As with any software that integrates with the Facebook platform, your use of
+ * this software is subject to the Facebook Developer Principles and Policies
+ * [http://developers.facebook.com/policy/]. This copyright notice shall be
+ * included in all copies or substantial portions of the software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+using System.IO;
+using UnityEngine;
+using UnityEditor;
+#if UNITY_IOS
+using UnityEditor.Build.Reporting;
+using UnityEditor.iOS.Xcode;
+#endif
+using UnityEditor.Callbacks;
+
+
+namespace Facebook.Unity.PostProcess
+{
+    /// <summary>
+    /// Automatically disables Bitcode on iOS builds
+    /// </summary>
+    public static class DisableBitcode
+    {
+        [PostProcessBuildAttribute(999)]
+        public static void OnPostProcessBuild(BuildTarget buildTarget, string pathToBuildProject)
+        {
+#if UNITY_IOS
+            if (buildTarget != BuildTarget.iOS) return;
+            string projectPath = pathToBuildProject + "/Unity-iPhone.xcodeproj/project.pbxproj";
+            PBXProject pbxProject = new PBXProject();
+            pbxProject.ReadFromFile(projectPath);
+
+            //Disabling Bitcode on all targets
+            //Main
+            string target = pbxProject.GetUnityMainTargetGuid();
+            pbxProject.SetBuildProperty(target, "ENABLE_BITCODE", "NO");
+            //Unity Tests
+            target = pbxProject.TargetGuidByName(PBXProject.GetUnityTestTargetName());
+            pbxProject.SetBuildProperty(target, "ENABLE_BITCODE", "NO");
+            //Unity Framework
+            target = pbxProject.GetUnityFrameworkTargetGuid();
+            pbxProject.SetBuildProperty(target, "ENABLE_BITCODE", "NO");
+
+            pbxProject.WriteToFile(projectPath);
+#endif
+        }
+    }
+}
+
+
+--- Zawartość pliku: C:\Users\Admin\Desktop\TestTask\Assets\Scripts\FacebookLogin.cs ---
+
+using UnityEngine;
+using Facebook.Unity;
+using UnityEngine.UI;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.SceneManagement;
+
+public class FacebookLogin : MonoBehaviour
+{
+    [SerializeField] private Button loginButton;
+    [SerializeField] private Text statusText;
+
+    private void Awake()
+    {
+        // Inicjalizacja Facebook SDK
+        if (!FB.IsInitialized)
+        {
+            FB.Init(InitCallback);
+        }
+        else
+        {
+            FB.ActivateApp();
+        }
+
+        // Dodanie listenera do przycisku
+        loginButton.onClick.AddListener(FacebookLoginButton);
+    }
+
+    private void InitCallback()
+    {
+        if (FB.IsInitialized)
+        {
+            FB.ActivateApp();
+        }
+        else
+        {
+            Debug.LogError("Failed to initialize Facebook SDK");
+        }
+    }
+
+    private void FacebookLoginButton()
+    {
+        var permissions = new List<string>() { "public_profile", "email" };
+        FB.LogInWithReadPermissions(permissions, AuthCallback);
+    }
+
+    private void AuthCallback(ILoginResult result)
+    {
+        if (FB.IsLoggedIn)
+        {
+            // U¿ytkownik zalogowany pomyœlnie
+            statusText.text = "Zalogowano pomyœlnie!";
+            StartCoroutine(LoadNextSceneAfterDelay());
+        }
+        else
+        {
+            // B³¹d logowania
+            statusText.text = "B³¹d logowania: " + result.Error;
+        }
+    }
+
+    private IEnumerator LoadNextSceneAfterDelay()
+    {
+        yield return new WaitForSeconds(3f);
+        // Za³aduj nastêpn¹ scenê - zmieñ "NazwaTwojejSceny" na w³aœciw¹ nazwê
+        SceneManager.LoadScene("GameScene");
+    }
+}
